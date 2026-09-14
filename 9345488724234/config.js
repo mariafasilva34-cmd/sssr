@@ -84,17 +84,17 @@ const GLOBAL_CONFIG = {
 // O Painel antigo não terá mais efeito no site.
 
 // ===== PROXY HELPER =====
-// Em localhost usa API direta; em produção (Netlify) usa proxy local pra evitar CORS
+// APIs diretas ou compatíveis com CORS
 const _IS_LOCAL = ['127.0.0.1', 'localhost'].includes(window.location.hostname);
 const API_BASES = {
-    techbynet: _IS_LOCAL ? 'https://corsproxy.io/?https://api-gateway.techbynet.com' : '/api/techbynet',
-    activepay: _IS_LOCAL ? 'https://api.activepay.com.br' : '/api/activepay',
-    ironpay: _IS_LOCAL ? 'https://api.ironpayapp.com.br' : '/api/ironpay',
-    unipay: _IS_LOCAL ? 'https://api.fastsoftbrasil.com' : '/api/unipay',
-    paguex: _IS_LOCAL ? 'https://corsproxy.io/?https://api.paguex.online' : '/api/paguex',
-    moonfy: _IS_LOCAL ? 'https://api.moooonfy.com.br' : '/api/moonfy',
-    mangofy: _IS_LOCAL ? 'https://corsproxy.io/?https://checkout.mangofy.com.br' : '/api/mangofy',
-    otimize: _IS_LOCAL ? 'https://api.otimizepagamentos.com' : '/api/otimize',
-    sigilopay: _IS_LOCAL ? 'https://corsproxy.io/?https://app.sigilopay.com.br/api/v1' : '/api/sigilopay',
-    blackcat: _IS_LOCAL ? 'https://api.blackcatpayments.com/api' : '/api/blackcat'
+    techbynet: 'https://api-gateway.techbynet.com',
+    activepay: 'https://api.activepay.com.br',
+    ironpay: 'https://api.ironpayapp.com.br',
+    unipay: 'https://api.fastsoftbrasil.com',
+    paguex: 'https://corsproxy.io/?https://api.paguex.online',
+    moonfy: 'https://api.moooonfy.com.br',
+    mangofy: 'https://corsproxy.io/?https://checkout.mangofy.com.br',
+    otimize: 'https://api.otimizepagamentos.com',
+    sigilopay: 'https://corsproxy.io/?https://app.sigilopay.com.br/api/v1',
+    blackcat: 'https://api.blackcatpayments.com/api'
 };
