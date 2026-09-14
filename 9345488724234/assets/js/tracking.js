@@ -52,7 +52,11 @@
   };
 
   window.gvdesenrolaAppendQuery = function (baseUrl) {
-    var u = new URL(baseUrl, window.location.origin);
+    var base = window.location.href;
+    if (!window.location.pathname.endsWith('/') && !window.location.pathname.endsWith('.html')) {
+      base = window.location.origin + window.location.pathname + '/' + window.location.search + window.location.hash;
+    }
+    var u = new URL(baseUrl, base);
     var m = window.gvdesenrolaMergeTracking();
     Object.keys(m).forEach(function (k) {
       if (!u.searchParams.has(k)) u.searchParams.set(k, m[k]);

@@ -552,8 +552,11 @@
   // sem next (pagamento principal) cai no padrão /upsell/1/. Repassa funil_ok + nome/cpf.
   function redirecionarAprovado(txId, gateway) {
     const urlParams = new URLSearchParams(window.location.search);
-    const next = urlParams.get('next') || '/upsell/1/';
-    const redirectUrl = new URL(next, window.location.origin);
+    let next = urlParams.get('next') || '../upsell/1/';
+    if (next.startsWith('/') && !next.startsWith('/9345488724234')) {
+      next = '/9345488724234' + next;
+    }
+    const redirectUrl = new URL(next, window.location.href);
     redirectUrl.searchParams.set('funil_ok', '1');
     const nome = urlParams.get('nome') || '';
     const cpf = urlParams.get('cpf') || '';
